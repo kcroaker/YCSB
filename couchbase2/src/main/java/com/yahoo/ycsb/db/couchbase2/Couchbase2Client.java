@@ -345,6 +345,22 @@ public class Couchbase2Client extends DB {
    * @return The result of the operation.
    */
   private Status updateKv(final String docId, final HashMap<String, ByteIterator> values) {
+    // This block of code is not the most efficient way of updating the document if values.size
+    // is less than half of existingDoc.size, but doing it this way allows the change to be isolated
+    // to a single block of code.
+    // Get document from couchbase and load content into result Hash
+    HashMap<String, ByteIterator> existingDoc = new HashMap<String, ByteIterator>();
+    if (readKv(docId, null, existingDoc) == Status.OK) {
+        // For each of the fields being updated (provided in the values Hash)
+        for (Map.Entry<String, ByteIterator> entry : existingDoc.entrySet()) {
+            // Update that field in the result
+            String key = entry.getKey();
+            if (!values.exists(key)) {
+                values.put(key, entry.getValue());
+            }
+        }
+    }
+    // push modified document to couchbase
     waitForMutationResponse(bucket.async().replace(
         RawJsonDocument.create(docId, documentExpiry, encode(values)),
         persistTo,
