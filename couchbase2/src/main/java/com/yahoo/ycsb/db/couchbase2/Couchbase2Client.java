@@ -345,11 +345,29 @@ public class Couchbase2Client extends DB {
    * @return The result of the operation.
    */
   private Status updateKv(final String docId, final HashMap<String, ByteIterator> values) {
+    
+
+    // Get document from couchbase and load content into result Hash
+    HashMap<String, ByteIterator> result;
+    RawJsonDocument loaded = bucket.get(docId, RawJsonDocument.class);
+    if (loaded == null) {
+      return Status.NOT_FOUND;
+    }
+    decode(loaded.content(), null, result);
+
+    // For each of the fields being updated (provided in the values Hash)
+    for (Map.Entry<String, ByteIterator> entry : values.entrySet()) {
+      // Update that field in the result
+      result.put(entry.getKey(), entry.getValue());
+    }
+
+    // push modified document to couchbase
     waitForMutationResponse(bucket.async().replace(
-        RawJsonDocument.create(docId, documentExpiry, encode(values)),
+        RawJsonDocument.create(docId, documentExpiry, encode(result)),
         persistTo,
         replicateTo
     ));
+
     return Status.OK;
   }
 
